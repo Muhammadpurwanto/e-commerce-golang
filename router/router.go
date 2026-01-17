@@ -1,29 +1,42 @@
 package router
 
 import (
-	"github.com/Muhammadpurwanto/e-commerce-golang/handler"             // Path ke handler
-	"github.com/Muhammadpurwanto/e-commerce-golang/internal/repository" // Path ke repository
+	"github.com/Muhammadpurwanto/e-commerce-golang/handler"
+	"github.com/Muhammadpurwanto/e-commerce-golang/internal/middleware" // Import middleware
+	"github.com/Muhammadpurwanto/e-commerce-golang/internal/repository"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"gorm.io/gorm"
 )
 
-// SetupRoutes mendefinisikan dan mengatur semua rute untuk aplikasi
 func SetupRoutes(app *fiber.App, db *gorm.DB) {
-	// Middleware
 	app.Use(logger.New())
 
 	// === Inisialisasi Repository dan Handler ===
+	// User/Auth
+	userRepository := repository.NewUserRepository(db)
+	authHandler := handler.NewAuthHandler(userRepository)
+	// Product
 	productRepository := repository.NewProductRepository(db)
 	productHandler := handler.NewProductHandler(productRepository)
 
-	// Grup rute untuk API v1
+	// Grup rute API v1
 	api := app.Group("/api/v1")
 
+	// Rute untuk Auth (Public)
+	api.Post("/register", authHandler.Register)
+	api.Post("/login", authHandler.Login)
+
 	// Rute untuk Produk
+	// Rute GET bisa diakses publik
 	api.Get("/products", productHandler.GetAllProducts)
 	api.Get("/products/:id", productHandler.GetProductByID)
-	api.Post("/products", productHandler.CreateProduct)
-	api.Put("/products/:id", productHandler.UpdateProduct)
-	api.Delete("/products/:id", productHandler.DeleteProduct)
+
+	// Rute yang membutuhkan otentikasi
+	protected := api.Use(middleware.AuthRequired())
+
+	// Hanya admin yang bisa membuat, mengubah, dan menghapus produk
+	protected.Post("/products", middleware.AdminOnly(), productHandler.CreateProduct)
+	protected.Put("/products/:id", middleware.AdminOnly(), productHandler.UpdateProduct)
+	protected.Delete("/products/:id", middleware.AdminOnly(), productHandler.DeleteProduct)
 }
