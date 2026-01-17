@@ -20,6 +20,9 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	productRepository := repository.NewProductRepository(db)
 	productHandler := handler.NewProductHandler(productRepository)
 
+	orderRepository := repository.NewOrderRepository(db)
+	orderHandler := handler.NewOrderHandler(orderRepository, productRepository)
+
 	// Grup rute API v1
 	api := app.Group("/api/v1")
 
@@ -33,10 +36,15 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	api.Get("/products/:id", productHandler.GetProductByID)
 
 	// Rute yang membutuhkan otentikasi
-	protected := api.Use(middleware.AuthRequired())
+	protected := api.Group("/", middleware.AuthRequired())
 
 	// Hanya admin yang bisa membuat, mengubah, dan menghapus produk
 	protected.Post("/products", middleware.AdminOnly(), productHandler.CreateProduct)
 	protected.Put("/products/:id", middleware.AdminOnly(), productHandler.UpdateProduct)
 	protected.Delete("/products/:id", middleware.AdminOnly(), productHandler.DeleteProduct)
+
+	// Rute Pesanan untuk semua user yang terotentikasi
+	protected.Post("/orders", orderHandler.CreateOrder)
+	protected.Get("/orders", orderHandler.GetUserOrders)
+	protected.Get("/orders/:id", orderHandler.GetOrderByID)
 }
