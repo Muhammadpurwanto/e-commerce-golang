@@ -5,6 +5,7 @@ import (
 
 	"github.com/Muhammadpurwanto/e-commerce-golang/internal/model"
 	"github.com/Muhammadpurwanto/e-commerce-golang/internal/repository"
+	"github.com/Muhammadpurwanto/e-commerce-golang/internal/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,7 +20,10 @@ func NewProductHandler(repo repository.ProductRepository) *ProductHandler {
 
 // GetAllProducts handler untuk mendapatkan semua produk
 func (h *ProductHandler) GetAllProducts(c *fiber.Ctx) error {
-	products, err := h.repo.FindAll()
+	// Generate pagination dari query params
+	pagination := utils.GeneratePaginationFromRequest(c)
+	products, err := h.repo.FindAll(&pagination) // Kirim pagination ke repo
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

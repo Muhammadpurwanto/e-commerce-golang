@@ -12,6 +12,8 @@ type OrderRepository interface {
 	Create(order *model.Order, items []model.OrderItem) (*model.Order, error)
 	FindUserOrders(userID uint) ([]model.Order, error)
 	FindOrderByID(orderID, userID uint) (model.Order, error)
+	UpdateStatus(orderID uint, status string) (model.Order, error)
+	FindOrderByIDForAdmin(orderID uint) (model.Order, error)
 }
 
 type orderRepository struct {
@@ -76,5 +78,23 @@ func (r *orderRepository) FindUserOrders(userID uint) ([]model.Order, error) {
 func (r *orderRepository) FindOrderByID(orderID, userID uint) (model.Order, error) {
 	var order model.Order
 	err := r.db.Preload("OrderItems.Product").Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error
+	return order, err
+}
+
+func (r *orderRepository) UpdateStatus(orderID uint, status string) (model.Order, error) {
+	var order model.Order
+	err := r.db.Model(&order).Where("id = ?", orderID).Update("status", status).Error
+	if err != nil {
+		return model.Order{}, err
+	}
+	// Ambil data order terbaru setelah update
+	r.db.Preload("User").Preload("OrderItems.Product").First(&order, orderID)
+	return order, nil
+}
+
+// FindOrderByIDForAdmin tidak dibatasi oleh userID
+func (r *orderRepository) FindOrderByIDForAdmin(orderID uint) (model.Order, error) {
+	var order model.Order
+	err := r.db.Preload("User").Preload("OrderItems.Product").First(&order, orderID).Error
 	return order, err
 }

@@ -64,6 +64,8 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create order: " + err.Error()})
 	}
 
+	createdOrder.User.Password = "" // Jangan kirim password hash di response
+
 	return c.Status(fiber.StatusCreated).JSON(createdOrder)
 }
 
@@ -91,4 +93,39 @@ func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 	}
 	
 	return c.JSON(order)
+}
+
+func (h *OrderHandler) UpdateOrderStatus(c *fiber.Ctx) error {
+	orderID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid order ID"})
+	}
+
+	type UpdateStatusRequest struct {
+		Status string `json:"status" validate:"required,oneof=pending paid shipped cancelled"`
+	}
+
+	var req UpdateStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
+	}
+
+	if err := utils.ValidateStruct(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Cek apakah order ada
+	_, err = h.orderRepo.FindOrderByIDForAdmin(uint(orderID))
+    if err != nil {
+        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Order not found"})
+    }
+
+	updatedOrder, err := h.orderRepo.UpdateStatus(uint(orderID), req.Status)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update order status"})
+	}
+
+	updatedOrder.User.Password = "" // Jangan kirim password hash di response
+
+	return c.JSON(updatedOrder)
 }
