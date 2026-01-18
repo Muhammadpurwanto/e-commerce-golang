@@ -32,7 +32,7 @@ func InitDatabase() *gorm.DB {
 
 	// AutoMigrate untuk membuat tabel secara otomatis
 	// Ini akan membuat tabel 'products' berdasarkan struct model.Product
-	db.AutoMigrate(&model.Product{}, model.User{}, model.Order{}, model.OrderItem{})
+	db.AutoMigrate(&model.Product{}, model.User{}, model.Order{}, model.OrderItem{}, model.Cart{}, model.CartItem{})
 	log.Println("Database migrated.")
 
 	return db

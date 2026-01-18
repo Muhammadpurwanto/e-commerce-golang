@@ -10,7 +10,7 @@ import (
 
 func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	app.Use(middleware.RequestLogger())
-	
+
 	// === Inisialisasi Repository dan Handler ===
 	// User/Auth
 	userRepository := repository.NewUserRepository(db)
@@ -22,6 +22,9 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 
 	orderRepository := repository.NewOrderRepository(db)
 	orderHandler := handler.NewOrderHandler(orderRepository, productRepository)
+
+	cartRepository := repository.NewCartRepository(db)
+	cartHandler := handler.NewCartHandler(cartRepository)
 
 	// Grup rute API v1
 	api := app.Group("/api/v1")
@@ -50,4 +53,9 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	protected.Post("/orders", orderHandler.CreateOrder)
 	protected.Get("/orders", orderHandler.GetUserOrders)
 	protected.Get("/orders/:id", orderHandler.GetOrderByID)
+
+	protected.Get("/cart", cartHandler.GetCart)
+	protected.Post("/cart/items", cartHandler.AddToCart)
+	protected.Put("/cart/items/:itemId", cartHandler.UpdateCartItem)
+	protected.Delete("/cart/items/:itemId", cartHandler.RemoveCartItem)
 }
