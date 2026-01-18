@@ -125,7 +125,7 @@ func (h *OrderHandler) UpdateOrderStatus(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update order status"})
 	}
 
-	updatedOrder.User.Password = "" // Jangan kirim password hash di response
+	updatedOrder.User.Password = "" // Jangan kirim password hash di response 
 
 	return c.JSON(updatedOrder)
 }

@@ -1,39 +1,55 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/Muhammadpurwanto/e-commerce-golang/config" // Path ke config
-	"github.com/Muhammadpurwanto/e-commerce-golang/router" // Path ke router
+	"github.com/Muhammadpurwanto/e-commerce-golang/config"
+	"github.com/Muhammadpurwanto/e-commerce-golang/router"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Memuat file .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found")
 	}
 
-	// 1. Inisialisasi Database
 	db := config.InitDatabase()
-
-	// 2. Inisialisasi Fiber App
 	app := fiber.New()
+	router.SetupRoutes(app, db)
 
-	// 3. Setup Rute
-	router.SetupRoutes(app, db) // Teruskan instance db ke router
+	// Channel untuk mendengarkan sinyal OS
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// 4. Menjalankan Server
-	port := os.Getenv("APP_PORT")
-	if port == "" {
-		port = "8080"
+	// Goroutine untuk menjalankan server
+	go func() {
+		port := os.Getenv("APP_PORT")
+		if port == "" {
+			port = "8080"
+		}
+		log.Printf("Server is starting on port %s\n", port)
+		if err := app.Listen(":" + port); err != nil {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Menunggu sinyal shutdown
+	<-quit
+	log.Println("Shutting down server...")
+
+	// Memberi waktu 30 detik untuk menyelesaikan request yang sedang berjalan
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := app.ShutdownWithContext(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
-	log.Printf("Server is starting on port %s\n", port)
-	err := app.Listen(":" + port)
-	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	log.Println("Server exiting")
 }

@@ -5,13 +5,12 @@ import (
 	"github.com/Muhammadpurwanto/e-commerce-golang/internal/middleware" // Import middleware
 	"github.com/Muhammadpurwanto/e-commerce-golang/internal/repository"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"gorm.io/gorm"
 )
 
 func SetupRoutes(app *fiber.App, db *gorm.DB) {
-	app.Use(logger.New())
-
+	app.Use(middleware.RequestLogger())
+	
 	// === Inisialisasi Repository dan Handler ===
 	// User/Auth
 	userRepository := repository.NewUserRepository(db)
