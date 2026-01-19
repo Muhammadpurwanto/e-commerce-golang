@@ -13,10 +13,11 @@ import (
 type OrderHandler struct {
 	orderRepo   repository.OrderRepository
 	productRepo repository.ProductRepository
+	cartRepo    repository.CartRepository
 }
 
-func NewOrderHandler(orderRepo repository.OrderRepository, productRepo repository.ProductRepository) *OrderHandler {
-	return &OrderHandler{orderRepo: orderRepo, productRepo: productRepo}
+func NewOrderHandler(orderRepo repository.OrderRepository, productRepo repository.ProductRepository, cartRepo repository.CartRepository) *OrderHandler {
+	return &OrderHandler{orderRepo: orderRepo, productRepo: productRepo, cartRepo: cartRepo}
 }
 
 func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
@@ -128,4 +129,28 @@ func (h *OrderHandler) UpdateOrderStatus(c *fiber.Ctx) error {
 	updatedOrder.User.Password = "" // Jangan kirim password hash di response 
 
 	return c.JSON(updatedOrder)
+}
+
+func (h *OrderHandler) Checkout(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
+
+	// 1. Ambil keranjang pengguna
+	cart, err := h.cartRepo.GetCartByUserID(uint(userID))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get user cart"})
+	}
+
+	// 2. Validasi jika keranjang kosong
+	if len(cart.CartItems) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot checkout with an empty cart"})
+	}
+
+	// 3. Panggil repository untuk menjalankan proses checkout transaksional
+	order, err := h.orderRepo.CreateOrderFromCart(uint(userID), cart)
+	if err != nil {
+		// Error bisa berasal dari validasi stok atau masalah database lainnya
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(order)
 }
