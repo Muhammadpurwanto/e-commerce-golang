@@ -26,6 +26,8 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	orderRepository := repository.NewOrderRepository(db)
 	orderHandler := handler.NewOrderHandler(orderRepository, productRepository, cartRepository)
 
+	// URL: /api/v1/uploads/*
+	app.Static("/api/v1/uploads", "./uploads")
 
 	// Grup rute API v1
 	api := app.Group("/api/v1")
@@ -49,6 +51,7 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	protected.Put("/products/:id", middleware.AdminOnly(), productHandler.UpdateProduct)
 	protected.Delete("/products/:id", middleware.AdminOnly(), productHandler.DeleteProduct)
 	protected.Patch("/orders/:id/status", middleware.AdminOnly(), orderHandler.UpdateOrderStatus)
+	protected.Post("/products/:id/upload", middleware.AdminOnly(), productHandler.UploadProductImage)
 
 	// Rute Pesanan untuk semua user yang terotentikasi
 	protected.Post("/orders", orderHandler.CreateOrder)
