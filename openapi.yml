@@ -1,0 +1,608 @@
+openapi: 3.0.3
+info:
+  title: "Go Fiber E-Commerce API"
+  description: "Dokumentasi API lengkap untuk aplikasi E-Commerce yang dibangun dengan Go, Fiber, dan GORM."
+  version: "1.0.0"
+  contact:
+    name: "API Support"
+    email: "support@example.com"
+
+servers:
+  - url: "http://localhost:8080/api/v1"
+    description: "Server Pengembangan Lokal"
+
+# Mendefinisikan skema keamanan (JWT Bearer Token)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+# Menetapkan keamanan secara global (bisa di-override per endpoint)
+security:
+  - bearerAuth: []
+
+paths:
+  # ===============================================================
+  # ==                         AUTH                             ==
+  # ===============================================================
+  /register:
+    post:
+      tags:
+        - Auth
+      summary: "Registrasi pengguna baru"
+      description: "Membuat akun pengguna baru (customer atau admin)."
+      security: [] # Endpoint ini publik
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUser'
+      responses:
+        '201':
+          description: "Pengguna berhasil dibuat"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: "Input tidak valid"
+        '409':
+          description: "Email sudah terdaftar"
+
+  /login:
+    post:
+      tags:
+        - Auth
+      summary: "Login pengguna"
+      description: "Mengotentikasi pengguna dan mengembalikan token JWT."
+      security: [] # Endpoint ini publik
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: "Login berhasil"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: "Email atau password salah"
+
+  # ===============================================================
+  # ==                         USER                             ==
+  # ===============================================================
+  /profile:
+    get:
+      tags:
+        - User
+      summary: "Mendapatkan profil pengguna"
+      description: "Mengambil detail profil pengguna yang sedang login."
+      responses:
+        '200':
+          description: "Profil pengguna berhasil diambil"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: "Tidak terotentikasi"
+
+  # ===============================================================
+  # ==                       PRODUCTS                           ==
+  # ===============================================================
+  /products:
+    get:
+      tags:
+        - Products
+      summary: "Mendapatkan daftar produk"
+      description: "Mengambil daftar produk dengan fitur pagination."
+      security: [] # Endpoint ini publik
+      parameters:
+        - name: page
+          in: query
+          description: "Nomor halaman"
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: "Jumlah item per halaman"
+          schema:
+            type: integer
+            default: 10
+        - name: sort
+          in: query
+          description: "Urutan sorting (e.g., 'price asc')"
+          schema:
+            type: string
+            default: "created_at desc"
+      responses:
+        '200':
+          description: "Daftar produk"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+    post:
+      tags:
+        - Products
+      summary: "Membuat produk baru (Admin)"
+      description: "Menambahkan produk baru ke dalam database. Hanya bisa diakses oleh admin."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: "Produk berhasil dibuat"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          description: "Akses ditolak (bukan admin)"
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: "Mendapatkan detail produk"
+      description: "Mengambil detail satu produk berdasarkan ID."
+      security: [] # Endpoint ini publik
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: "Detail produk"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: "Produk tidak ditemukan"
+    put:
+      tags:
+        - Products
+      summary: "Memperbarui produk (Admin)"
+      description: "Memperbarui detail produk berdasarkan ID. Hanya bisa diakses oleh admin."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: "Produk berhasil diperbarui"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: "Produk tidak ditemukan"
+    delete:
+      tags:
+        - Products
+      summary: "Menghapus produk (Admin)"
+      description: "Menghapus produk dari database berdasarkan ID. Hanya bisa diakses oleh admin."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: "Produk berhasil dihapus"
+        '404':
+          description: "Produk tidak ditemukan"
+          
+  /products/{id}/upload:
+    post:
+      tags:
+        - Products
+      summary: "Upload gambar produk (Admin)"
+      description: "Mengunggah gambar untuk produk tertentu. Hanya bisa diakses oleh admin."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: "Gambar berhasil diunggah dan produk diperbarui"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+  # ===============================================================
+  # ==                          CART                            ==
+  # ===============================================================
+  /cart:
+    get:
+      tags:
+        - Cart
+      summary: "Melihat keranjang belanja"
+      description: "Mengambil detail keranjang belanja milik pengguna yang sedang login."
+      responses:
+        '200':
+          description: "Detail keranjang belanja"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+  /cart/items:
+    post:
+      tags:
+        - Cart
+      summary: "Menambah item ke keranjang"
+      description: "Menambahkan produk ke keranjang. Jika produk sudah ada, akan memperbarui jumlahnya."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequest'
+      responses:
+        '201':
+          description: "Item berhasil ditambahkan"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+  /cart/items/{itemId}:
+    put:
+      tags:
+        - Cart
+      summary: "Memperbarui jumlah item di keranjang"
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: "Item berhasil diperbarui"
+    delete:
+      tags:
+        - Cart
+      summary: "Menghapus item dari keranjang"
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: "Item berhasil dihapus"
+
+  # ===============================================================
+  # ==                         ORDERS                           ==
+  # ===============================================================
+  /checkout:
+    post:
+      tags:
+        - Orders
+      summary: "Checkout keranjang belanja"
+      description: "Mengubah isi keranjang belanja menjadi pesanan (order) baru dan mengosongkan keranjang."
+      responses:
+        '201':
+          description: "Checkout berhasil, pesanan dibuat"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: "Keranjang kosong atau stok tidak cukup"
+
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: "Melihat riwayat pesanan"
+      description: "Mengambil daftar semua pesanan yang pernah dibuat oleh pengguna."
+      responses:
+        '200':
+          description: "Daftar pesanan"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+  /orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: "Melihat detail pesanan"
+      description: "Mengambil detail pesanan spesifik milik pengguna."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: "Detail pesanan"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: "Pesanan tidak ditemukan"
+          
+  /orders/{id}/status:
+    patch:
+      tags:
+        - Orders
+      summary: "Memperbarui status pesanan (Admin)"
+      description: "Mengubah status pesanan (e.g., 'pending' ke 'shipped'). Hanya bisa diakses oleh admin."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "shipped"
+                  enum: [pending, paid, shipped, cancelled]
+      responses:
+        '200':
+          description: "Status pesanan berhasil diperbarui"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+# ===============================================================
+# ==                         SCHEMAS                          ==
+# ===============================================================
+components:
+  schemas:
+    # --- MODEL SCHEMAS ---
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Laptop Pro"
+        sku:
+          type: string
+          example: "LP001"
+        price:
+          type: number
+          format: float
+          example: 15000000
+        stock:
+          type: integer
+          example: 50
+        image_url:
+          type: string
+          example: "http://localhost:8080/api/v1/uploads/product-1-1678886400.jpg"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+        role:
+          type: string
+          example: "customer"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+        price:
+          type: number
+          format: float
+        product:
+          $ref: '#/components/schemas/Product'
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        total_amount:
+          type: number
+          format: float
+        status:
+          type: string
+        order_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        created_at:
+          type: string
+          format: date-time
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+        product:
+          $ref: '#/components/schemas/Product'
+
+    Cart:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        cart_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        created_at:
+          type: string
+          format: date-time
+
+    # --- REQUEST & RESPONSE SCHEMAS ---
+    RegisterUser:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: "Jane Doe"
+        email:
+          type: string
+          format: email
+          example: "jane.doe@example.com"
+        password:
+          type: string
+          format: password
+          example: "password123"
+        role:
+          type: string
+          example: "customer"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "jane.doe@example.com"
+        password:
+          type: string
+          format: password
+          example: "password123"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    ProductRequest:
+      type: object
+      required: [name, sku, price, stock]
+      properties:
+        name:
+          type: string
+          example: "Gaming Mouse"
+        sku:
+          type: string
+          example: "GM002"
+        price:
+          type: number
+          format: float
+          example: 750000
+        stock:
+          type: integer
+          example: 100
+
+    AddToCartRequest:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 2
+
+    UpdateCartItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          example: 3
